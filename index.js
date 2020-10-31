@@ -4,9 +4,13 @@ const axios = require("axios");
 const cheerio = require("cheerio");
 const puppeteer = require("puppeteer");
 const app = express();
-// const request = require("request");
+const bodyParser = require("body-parser");
+const request = require("request");
+const urlencode = require("urlencode");
 
 app.use(cors());
+app.use(bodyParser.urlencoded({ extended: false }));
+app.use(bodyParser.json());
 
 app.get("/naver", async (req, res) => {
   const { data } = await axios.get("https://comic.naver.com/index.nhn");
@@ -38,6 +42,7 @@ app.get("/naver", async (req, res) => {
   }
   res.status(200).json({ webtoonlist });
 });
+
 app.get("/daum", async (req, res) => {
   const browser = await puppeteer.launch({
     headless: true,
@@ -92,6 +97,29 @@ app.get("/kakao", async (req, res) => {
   }
   browser.close();
   res.status(200).json({ webtoonlist });
+});
+
+app.post("/search", async (req, res) => {
+  const { search, selectSite } = req.body;
+  const siteList = [
+    {
+      url: "https://comic.naver.com/search.nhn?keyword=",
+      value: 1,
+    },
+  ];
+  const site = siteList.find((s) => s.value === selectSite);
+
+  const { data } = await axios.get(`${site.url}${urlencode(search)}`);
+  const naverwebtoonHtml = cheerio.load(data);
+
+  const searchResult = naverwebtoonHtml("div.resultBox .resultList li").first();
+
+  const webToonURL = searchResult.find("h5 a").attr("href");
+  console.log(webToonURL);
+
+  res.status(200).json({
+    url: `https://comic.naver.com${webToonURL}`,
+  });
 });
 
 app.listen(8080, () => {
